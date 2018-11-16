@@ -28,6 +28,7 @@ abstract class BaseProvider
 	protected $currency;
 	protected $callback_url;
 	protected $transaction_code;
+	protected $db;
 
 	protected $transaction		= null;
 	protected $card_number		= null;
@@ -45,6 +46,10 @@ abstract class BaseProvider
 	{
 		$this->request = app('request');
 		$this->setCurrency(self::IRR);
+	}
+
+	public function useDB($db = true) {
+		$this->db = $db;
 	}
 
 	public function setDescription($description)
@@ -126,6 +131,7 @@ abstract class BaseProvider
 
 	public function setTransaction($transaction)
 	{
+		if(!$this->db) return $this;
 		if($transaction instanceOf IranPaymentTransaction) {
 			$this->transaction = $transaction;
 		} else {
@@ -217,36 +223,49 @@ abstract class BaseProvider
 		return $this;
 	}
 
+	/**
+	 * verify function
+	 * 
+	 * in case using your own transaction table pass refrence number otherwise pass transaction model or transction's id or tracking code
+	 * @param string|integer|IranPaymentTransaction|null $transaction
+	 * @return self
+	 * 
+	 * @throws Exception|InvalidRequestException|InvalidDataException|RetryException
+	 */
 	public function verify($transaction = null)
 	{
-		if($transaction) {
-			$this->setTransaction($transaction);
+		if(!$this->db) {
+			if(!$this->reference_number) $this->setReferenceNumber($transaction);
 		} else {
-			if(!$this->transaction) {
-				if (isset($request->transaction)) {
-					$this->setTransaction($request->transaction);
-				} else {
-					throw new InvalidRequestException;
+			if($transaction) {
+				$this->setTransaction($transaction);
+			} else {
+				if(!$this->transaction) {
+					if (isset($request->transaction)) {
+						$this->setTransaction($request->transaction);
+					} else {
+						throw new InvalidRequestException;
+					}
 				}
 			}
-		}
-		
-		$this->setCardNumber($this->transaction->card_number);
-		$this->setReferenceNumber($this->transaction->reference_number);
-		$this->setTrackingCode($this->transaction->tracking_code);
-		$this->setCurrency($this->transaction->currency);
-		$this->setAmount($this->transaction->amount);
-		if ($this->transaction->status == IranPaymentTransaction::T_SUCCEED) {
-			return $this;
-			// throw new SucceedRetryException;
-		} elseif ($this->transaction->status != IranPaymentTransaction::T_PENDING) {
-			throw new RetryException;
-		}
-		if ($this->amount <= 0) {
-			throw new InvalidDataException(InvalidDataException::INVALID_AMOUNT);
-		}
-		if (!in_array($this->currency, [self::IRR, self::IRT])) {
-			throw new InvalidDataException(InvalidDataException::INVALID_CURRENCY);
+			
+			$this->setCardNumber($this->transaction->card_number);
+			$this->setReferenceNumber($this->transaction->reference_number);
+			$this->setTrackingCode($this->transaction->tracking_code);
+			$this->setCurrency($this->transaction->currency);
+			$this->setAmount($this->transaction->amount);
+			if ($this->transaction->status == IranPaymentTransaction::T_SUCCEED) {
+				return $this;
+				// throw new SucceedRetryException;
+			} elseif ($this->transaction->status != IranPaymentTransaction::T_PENDING) {
+				throw new RetryException;
+			}
+			if ($this->amount <= 0) {
+				throw new InvalidDataException(InvalidDataException::INVALID_AMOUNT);
+			}
+			if (!in_array($this->currency, [self::IRR, self::IRT])) {
+				throw new InvalidDataException(InvalidDataException::INVALID_CURRENCY);
+			}
 		}
 		$this->verifyRequest();
 		return $this;
@@ -260,6 +279,7 @@ abstract class BaseProvider
 		if (empty($this->amount) || $this->amount <= 0) {
 			throw new InvalidDataException(InvalidDataException::INVALID_AMOUNT);
 		}
+		if(!$this->db) return;
 		app('db')->transaction(function() {
 			$this->transaction	= new IranPaymentTransaction([
 				'amount'		=> $this->amount,
@@ -277,6 +297,7 @@ abstract class BaseProvider
 
 	protected function transactionSucceed(array $params = null)
 	{
+		if(!$this->db) return;
 		$this->transaction	= IranPaymentTransaction::find($this->transaction->id);
 		if($params) {
 			$this->transaction->fill($params);
@@ -288,6 +309,7 @@ abstract class BaseProvider
 
 	protected function transactionFailed()
 	{
+		if(!$this->db) return;
 		$this->transaction				= IranPaymentTransaction::find($this->transaction->id);
 		$this->transaction->status		= IranPaymentTransaction::T_FAILED;
 		$this->transaction->description	= $this->description;
@@ -296,6 +318,7 @@ abstract class BaseProvider
 
 	protected function transactionPending(array $params = null)
 	{
+		if(!$this->db) return;
 		$this->checkTransaction();
 		$this->transaction->status	= IranPaymentTransaction::T_PENDING;
 		if($params) {
@@ -306,6 +329,7 @@ abstract class BaseProvider
 
 	protected function transactionVerifyPending()
 	{
+		if(!$this->db) return;
 		$this->checkTransaction();
 		$this->transaction->status	= IranPaymentTransaction::T_VERIFY_PENDING;
 		$this->transaction->save();
@@ -313,6 +337,7 @@ abstract class BaseProvider
 
 	protected function transactionUpdate(array $params = null)
 	{
+		if(!$this->db) return;
 		$this->transaction	= IranPaymentTransaction::find($this->transaction->id);
 		if($params) {
 			$this->transaction->fill($params);
@@ -322,6 +347,7 @@ abstract class BaseProvider
 
 	protected function transactionPaidBack()
 	{
+		if(!$this->db) return;
 		$this->checkTransaction();
 		$this->transaction->status	= IranPaymentTransaction::T_PAID_BACK;
 		$this->transaction->save();
@@ -329,6 +355,7 @@ abstract class BaseProvider
 
 	protected function transactionCanceled(array $params = null)
 	{
+		if(!$this->db) return;
 		$this->checkTransaction();
 		if($params) {
 			$this->transaction->fill($params);

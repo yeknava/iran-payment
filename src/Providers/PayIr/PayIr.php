@@ -3,6 +3,8 @@
 namespace Dena\IranPayment\Providers\PayIr;
 
 use Dena\IranPayment\Exceptions\InvalidDataException;
+use Dena\IranPayment\Exceptions\TransactionNotFoundException;
+
 
 use Dena\IranPayment\Providers\BaseProvider;
 
@@ -110,9 +112,9 @@ class PayIr extends BaseProvider implements ProviderInterface
 	{
 		$this->prepareAmount();
 
-		if (!isset($this->request->transId, $this->request->status)) {
-			$e = new ZarinpalException(-11);
-			$this->setDescription($e->getMessage());
+		if (!$this->getReferenceNumber()) {
+			$e = new TransactionNotFoundException();
+			$this->setDescription("شناسه تراکنش برای تایید لازم است.");
 			$this->transactionFailed();
 			throw $e;
 		}

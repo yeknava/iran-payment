@@ -30,10 +30,12 @@ class IranPayment
 
 	protected $gateway;
 	protected $extended;
+	protected $db;
 
-	public function __construct($gateway = null)
+	public function __construct($gateway = null, $db = true)
 	{
 		$this->extended = false;
+		$this->db = $db;
 		$this->setDefaults();
 		if ($gateway) {
 			$this->setGateway($gateway);
@@ -118,6 +120,7 @@ class IranPayment
 				}
 				break;
 		}
+		$this->gateway->useDB($this->db);
 		return $this;
 	}
 
