@@ -74,7 +74,7 @@ class PayIr extends BaseProvider implements ProviderInterface
 		$this->prepareAmount();
 	}
 
-	protected function payRequest()
+	public function payRequest()
 	{
 		$this->payPrepare();
 
@@ -96,7 +96,7 @@ class PayIr extends BaseProvider implements ProviderInterface
 			throw $e;
 		}
 
-		if(!isset($result->status)) {
+		if(!isset($result->status) || isset($result->errorCode)) {
 			$this->setDescription($result->errorMessage);
 			$this->transactionFailed();
 			throw new Exception($result->errorMessage, 400);
@@ -122,7 +122,7 @@ class PayIr extends BaseProvider implements ProviderInterface
 		$this->transactionVerifyPending();
 	}
 
-	protected function verifyRequest()
+	public function verifyRequest()
 	{
 		$this->verifyPrepare();
 
